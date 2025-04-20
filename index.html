@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple Chatroom</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #181818; color: #f1f1f1; margin: 0; padding: 0; }
+    .container { max-width: 800px; margin: auto; padding: 20px; }
+    #login, #signup, #chatroom { display: none; }
+    .hidden { display: none; }
+    .message { margin: 5px 0; }
+    input, button { padding: 10px; margin: 5px 0; width: 100%; }
+    .admin-controls { margin-top: 10px; }
+    #messages { max-height: 300px; overflow-y: auto; border: 1px solid #444; padding: 10px; margin-bottom: 10px; }
+    .friend { margin: 5px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="login">
+      <h2>Login</h2>
+      <input id="loginUser" placeholder="Username">
+      <input id="loginPass" placeholder="Password" type="password">
+      <button onclick="login()">Login</button>
+      <p>No account? <a href="#" onclick="showSignup()">Sign up</a></p>
+    </div>
+
+    <div id="signup">
+      <h2>Sign Up</h2>
+      <input id="signupUser" placeholder="Username">
+      <input id="signupPass" placeholder="Password" type="password">
+      <button onclick="signup()">Sign Up</button>
+      <p>Have an account? <a href="#" onclick="showLogin()">Log in</a></p>
+    </div>
+
+    <div id="chatroom">
+      <h2>Chatroom</h2>
+      <div id="messages"></div>
+      <input id="chatInput" placeholder="Say something" onkeydown="if(event.key==='Enter') sendMessage()">
+      <button onclick="sendMessage()">Send</button>
+      <div class="admin-controls" id="adminControls"></div>
+      <h3>Friends</h3>
+      <div id="friends"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null;
+    let users = JSON.parse(localStorage.getItem('users') || '{}');
+    let chatLog = JSON.parse(localStorage.getItem('chatLog') || '[]');
+    let friends = JSON.parse(localStorage.getItem('friends') || '{}');
+    let mutedUsers = {};
+    const adminUsername = 'admin';
+    const adminPassword = 'admin';
+
+    function saveData() {
+      localStorage.setItem('users', JSON.stringify(users));
+      localStorage.setItem('chatLog', JSON.stringify(chatLog));
+      localStorage.setItem('friends', JSON.stringify(friends));
+    }
+
+    function showLogin() {
+      document.getElementById('login').style.display = 'block';
+      document.getElementById('signup').style.display = 'none';
+    }
+
+    function showSignup() {
+      document.getElementById('signup').style.display = 'block';
+      document.getElementById('login').style.display = 'none';
+    }
+
+    function signup() {
+      const user = document.getElementById('signupUser').value;
+      const pass = document.getElementById('signupPass').value;
+      if (users[user]) return alert('User exists');
+      users[user] = { password: pass, banned: false };
+      friends[user] = [];
+      saveData();
+      alert('Signed up!');
+      showLogin();
+    }
+
+    function login() {
+      const user = document.getElementById('loginUser').value;
+      const pass = document.getElementById('loginPass').value;
+      if (!users[user] || users[user].password !== pass) return alert('Wrong credentials');
+      if (users[user].banned) return alert('You are banned');
+      currentUser = user;
+      showChatroom();
+    }
+
+    function showChatroom() {
+      document.getElementById('login').style.display = 'none';
+      document.getElementById('signup').style.display = 'none';
+      document.getElementById('chatroom').style.display = 'block';
+      updateMessages();
+      updateFriends();
+      if (currentUser === adminUsername) showAdminControls();
+    }
+
+    function updateMessages() {
+      const container = document.getElementById('messages');
+      container.innerHTML = '';
+      for (const msg of chatLog) {
+        const div = document.createElement('div');
+        div.className = 'message';
+        div.textContent = `${msg.user}: ${msg.text}`;
+        container.appendChild(div);
+      }
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text || mutedUsers[currentUser]) return;
+      chatLog.push({ user: currentUser, text });
+      input.value = '';
+      saveData();
+      updateMessages();
+    }
+
+    function showAdminControls() {
+      const adminDiv = document.getElementById('adminControls');
+      adminDiv.innerHTML = `
+        <h3>Admin Controls</h3>
+        <input id="targetUser" placeholder="Target username">
+        <button onclick="banUser()">Ban</button>
+        <button onclick="kickUser()">Kick</button>
+        <button onclick="muteUser()">Mute</button>
+      `;
+    }
+
+    function banUser() {
+      const target = document.getElementById('targetUser').value;
+      if (users[target]) {
+        users[target].banned = true;
+        saveData();
+        alert(`${target} is banned`);
+      }
+    }
+
+    function kickUser() {
+      alert('Kick works only if real-time server was used');
+    }
+
+    function muteUser() {
+      const target = document.getElementById('targetUser').value;
+      mutedUsers[target] = true;
+      alert(`${target} is muted`);
+    }
+
+    function updateFriends() {
+      const friendList = friends[currentUser] || [];
+      const container = document.getElementById('friends');
+      container.innerHTML = '';
+      for (const f of friendList) {
+        const div = document.createElement('div');
+        div.className = 'friend';
+        div.textContent = f;
+        div.onclick = () => privateChat(f);
+        container.appendChild(div);
+      }
+    }
+
+    function privateChat(friend) {
+      const chat = chatLog.filter(msg => (msg.user === currentUser && msg.to === friend) || (msg.user === friend && msg.to === currentUser));
+      const output = chat.map(msg => `${msg.user}: ${msg.text}`).join('\n');
+      alert(`Private chat with ${friend}:\n` + output);
+    }
+
+    window.onload = showLogin;
+  </script>
+</body>
+</html>
